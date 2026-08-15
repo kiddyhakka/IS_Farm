@@ -38,6 +38,14 @@
       </div>
       
       <div class="flex items-center space-x-2 sm:space-x-3 text-xs sm:text-sm">
+        <!-- 試算表快速切換下拉選單 -->
+        <div class="flex items-center gap-1 bg-emerald-900/80 px-2.5 py-1 rounded-lg border border-emerald-600/50">
+          <span class="text-xs text-emerald-200 hidden md:inline">📊 試算表:</span>
+          <select id="headerSheetSelector" onchange="switchActiveSheet(this.value)" class="bg-emerald-900 text-white text-xs font-medium outline-none cursor-pointer py-0.5">
+            <!-- Dynamically populated -->
+          </select>
+        </div>
+
         <button type="button" onclick="fetchFromGas(true)" id="refreshBtn" class="bg-emerald-700 hover:bg-emerald-600 px-3 py-1.5 rounded-lg text-white font-medium transition flex items-center gap-1 shadow-sm active:scale-95">
           <svg id="refreshIcon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
           <span id="refreshBtnText">同步試算表</span>
@@ -593,30 +601,64 @@
     <!-- VIEW 6: Google Sheets Settings (Admin) -->
     <section id="view-gas" class="hidden space-y-6">
       <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-        <h2 class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-          <span>🔒 Google Sheets 雲端連線設定</span>
+        <h2 class="text-lg font-bold text-slate-800 mb-2 flex items-center gap-2">
+          <span>🔒 多組 Google Sheets 雲端連線設定 (管理者專屬)</span>
         </h2>
+        <p class="text-xs text-slate-500 mb-4">您可以設定並儲存多組 Google 試算表連線（例如：主農場、二號溫室、合作農場等），並在頂部選單快速切換。</p>
 
-        <form id="gasConfigForm" onsubmit="event.preventDefault(); saveGasConfig();" class="space-y-4">
-          <div>
-            <label class="block text-xs font-semibold text-slate-600 mb-1">Google Apps Script (GAS) API 部署網址</label>
-            <input type="url" id="gasUrlInput" required class="w-full border border-slate-300 rounded-lg p-2.5 text-sm font-mono outline-none">
+        <form id="gasConfigForm" onsubmit="event.preventDefault(); saveGasConfig();" class="space-y-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+          <input type="hidden" id="gasSheetIdInput">
+          
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div class="sm:col-span-1">
+              <label class="block text-xs font-semibold text-slate-600 mb-1">試算表識別名稱</label>
+              <input type="text" id="gasNameInput" required placeholder="例如：義勝農場 - 二號棚" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm outline-none">
+            </div>
+
+            <div class="sm:col-span-2">
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Google Apps Script (GAS) API 部署網址</label>
+              <input type="url" id="gasUrlInput" required placeholder="https://script.google.com/macros/s/.../exec" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm font-mono outline-none">
+            </div>
           </div>
 
           <div>
-            <label class="block text-xs font-semibold text-slate-600 mb-1">Google 試算表網頁開啟連結</label>
-            <input type="url" id="gasSheetUrlInput" required class="w-full border border-slate-300 rounded-lg p-2.5 text-sm font-mono outline-none">
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Google 試算表網頁開啟連結 (選填)</label>
+            <input type="url" id="gasSheetUrlInput" placeholder="https://docs.google.com/spreadsheets/d/..." class="w-full border border-slate-300 rounded-lg p-2.5 text-sm font-mono outline-none">
           </div>
 
-          <div class="flex flex-wrap gap-3">
-            <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-6 rounded-lg transition shadow-sm active:scale-95">
-              💾 儲存設定並重新同步
+          <div class="flex flex-wrap gap-3 pt-2">
+            <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-5 rounded-lg text-sm transition shadow-sm active:scale-95">
+              💾 儲存試算表設定
             </button>
-            <button type="button" onclick="openGoogleSheet()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-6 rounded-lg transition shadow-sm flex items-center gap-1 active:scale-95">
-              🔗 開啟 Google 試算表
+            <button type="button" onclick="resetGasForm()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-2 px-4 rounded-lg text-sm transition">
+              清空重填
             </button>
           </div>
         </form>
+      </div>
+
+      <!-- Multiple Sheets Management Table -->
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+          <h3 class="font-bold text-slate-800">📋 已登記之 Google 試算表列表</h3>
+          <span class="text-xs text-slate-500">可在上方頂部選單隨時切換目前作用中的試算表</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm">
+            <thead class="bg-slate-100 text-slate-600 text-xs uppercase border-b border-slate-200">
+              <tr>
+                <th class="p-3">當前啟用</th>
+                <th class="p-3">試算表名稱</th>
+                <th class="p-3">GAS API 網址</th>
+                <th class="p-3">試算表連結</th>
+                <th class="p-3 text-center">操作</th>
+              </tr>
+            </thead>
+            <tbody id="gasSheetsTable" class="divide-y divide-slate-200">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+        </div>
       </div>
     </section>
 
@@ -721,12 +763,33 @@
       "莧菜":   { fert: 5, pest1: 8, pest2: 15, h1: 25, h2: 32, expiry: 45 }
     };
 
+    // 多試算表預設與初始化
+    const DEFAULT_GAS_SHEETS = [
+      {
+        id: "sheet-main",
+        name: "義勝農場 - 主庫/總表",
+        gasUrl: "https://script.google.com/macros/s/AKfycbwkcSYoJ3hHM97UX0CpB-bwNZzEqzMlb_kBmOstFRLw0lyVPbaxlP-74rQRa_gVH07mAA/exec",
+        sheetUrl: "https://docs.google.com/spreadsheets/d/1iAE6GgEGsL-oabPWQpUZ5FUWXQivMpabwPYTk0QGq2s/edit?gid=0#gid=0"
+      }
+    ];
+
+    let initialSheetsList = JSON.parse(localStorage.getItem("farm_gas_sheets_list") || "null");
+    if (!initialSheetsList || !Array.isArray(initialSheetsList) || initialSheetsList.length === 0) {
+      initialSheetsList = DEFAULT_GAS_SHEETS;
+      localStorage.setItem("farm_gas_sheets_list", JSON.stringify(initialSheetsList));
+    }
+
+    let activeSheetId = localStorage.getItem("farm_active_sheet_id") || initialSheetsList[0].id;
+    let activeSheetObj = initialSheetsList.find(s => s.id === activeSheetId) || initialSheetsList[0];
+
     // 全局狀態管理
     let state = {
       isAdminLoggedIn: false,
       pendingTargetTab: null,
-      gasUrl: localStorage.getItem("gas_app_url") || "https://script.google.com/macros/s/AKfycbwkcSYoJ3hHM97UX0CpB-bwNZzEqzMlb_kBmOstFRLw0lyVPbaxlP-74rQRa_gVH07mAA/exec",
-      gasSheetUrl: localStorage.getItem("gas_sheet_url") || "https://docs.google.com/spreadsheets/d/1iAE6GgEGsL-oabPWQpUZ5FUWXQivMpabwPYTk0QGq2s/edit?gid=0#gid=0",
+      gasSheetsList: initialSheetsList,
+      activeSheetId: activeSheetObj.id,
+      gasUrl: activeSheetObj.gasUrl,
+      gasSheetUrl: activeSheetObj.sheetUrl,
       units: JSON.parse(localStorage.getItem("farm_units") || JSON.stringify({
         "包": 0.3, "把": 0.25, "斤": 0.6, "籃": 12.0, "袋": 5.0, "kg": 1.0
       })),
@@ -802,16 +865,15 @@
       if (rawInEl) rawInEl.value = todayStr;
       if (shipDateEl) shipDateEl.value = todayStr;
 
-      if (document.getElementById("gasUrlInput")) document.getElementById("gasUrlInput").value = state.gasUrl;
-      if (document.getElementById("gasSheetUrlInput")) document.getElementById("gasSheetUrlInput").value = state.gasSheetUrl;
-
       autoFillSchedule();
       generateNewRawLotNo();
       generateNewShipNo();
       renderUnitConfigForm();
       populateCustomerDropdown();
+      populateHeaderSheetSelector();
+      renderGasSheetsTable();
 
-      // 從 Google 試算表拉取最新數據
+      // 從當前選擇的 Google 試算表拉取最新數據
       fetchFromGas(false);
     };
 
@@ -1217,19 +1279,170 @@
     }
 
     function saveGasConfig() {
-      state.gasUrl = document.getElementById("gasUrlInput").value;
-      state.gasSheetUrl = document.getElementById("gasSheetUrlInput").value;
-      localStorage.setItem("gas_app_url", state.gasUrl);
-      localStorage.setItem("gas_sheet_url", state.gasSheetUrl);
-      showToast("✅ Google Sheets 串接設定已更新！重新同步中...", "success");
+      const sheetId = document.getElementById("gasSheetIdInput").value;
+      const name = document.getElementById("gasNameInput").value.trim();
+      const gasUrl = document.getElementById("gasUrlInput").value.trim();
+      const sheetUrl = document.getElementById("gasSheetUrlInput").value.trim();
+
+      if (!name || !gasUrl) {
+        showToast("⚠️ 請填寫試算表名稱與 GAS API 網址", "warning");
+        return;
+      }
+
+      if (sheetId) {
+        // 編輯現有項目
+        const existing = state.gasSheetsList.find(s => s.id === sheetId);
+        if (existing) {
+          existing.name = name;
+          existing.gasUrl = gasUrl;
+          existing.sheetUrl = sheetUrl;
+        }
+      } else {
+        // 新增項目
+        const newObj = {
+          id: "sheet-" + Date.now(),
+          name: name,
+          gasUrl: gasUrl,
+          sheetUrl: sheetUrl
+        };
+        state.gasSheetsList.push(newObj);
+        // 如果是第一筆，設為 active
+        if (state.gasSheetsList.length === 1) {
+          state.activeSheetId = newObj.id;
+        }
+      }
+
+      // 若目前編輯的是作用中的試算表，同步更新狀態
+      if (sheetId === state.activeSheetId || (!sheetId && state.gasSheetsList.length === 1)) {
+        const curActive = state.gasSheetsList.find(s => s.id === state.activeSheetId);
+        if (curActive) {
+          state.gasUrl = curActive.gasUrl;
+          state.gasSheetUrl = curActive.sheetUrl;
+        }
+      }
+
+      saveGasSheetsState();
+      resetGasForm();
+      renderGasSheetsTable();
+      populateHeaderSheetSelector();
+
+      showToast("✅ Google Sheets 連線設定已儲存！", "success");
       fetchFromGas(true);
+    }
+
+    function switchActiveSheet(id) {
+      const target = state.gasSheetsList.find(s => s.id === id);
+      if (!target) return;
+
+      state.activeSheetId = target.id;
+      state.gasUrl = target.gasUrl;
+      state.gasSheetUrl = target.sheetUrl;
+
+      saveGasSheetsState();
+      populateHeaderSheetSelector();
+      renderGasSheetsTable();
+
+      showToast(`已切換至試算表：${target.name}`, "info");
+      fetchFromGas(true);
+    }
+
+    function editGasSheet(id) {
+      const target = state.gasSheetsList.find(s => s.id === id);
+      if (!target) return;
+
+      document.getElementById("gasSheetIdInput").value = target.id;
+      document.getElementById("gasNameInput").value = target.name;
+      document.getElementById("gasUrlInput").value = target.gasUrl;
+      document.getElementById("gasSheetUrlInput").value = target.sheetUrl || "";
+
+      window.scrollTo({ top: document.getElementById("gasConfigForm").offsetTop - 80, behavior: "smooth" });
+    }
+
+    function deleteGasSheet(id) {
+      if (state.gasSheetsList.length <= 1) {
+        showToast("⚠️ 必須至少保留一組 Google 試算表連線！", "warning");
+        return;
+      }
+
+      showConfirm("刪除試算表設定", "確定要刪除這組試算表連線資訊嗎？", function() {
+        state.gasSheetsList = state.gasSheetsList.filter(s => s.id !== id);
+        
+        // 如果刪除的是當前啟用的，將作用中切換為第一筆
+        if (state.activeSheetId === id) {
+          const first = state.gasSheetsList[0];
+          state.activeSheetId = first.id;
+          state.gasUrl = first.gasUrl;
+          state.gasSheetUrl = first.sheetUrl;
+        }
+
+        saveGasSheetsState();
+        populateHeaderSheetSelector();
+        renderGasSheetsTable();
+        showToast("已刪除該試算表設定", "info");
+        fetchFromGas(true);
+      });
+    }
+
+    function resetGasForm() {
+      document.getElementById("gasSheetIdInput").value = "";
+      document.getElementById("gasNameInput").value = "";
+      document.getElementById("gasUrlInput").value = "";
+      document.getElementById("gasSheetUrlInput").value = "";
+    }
+
+    function saveGasSheetsState() {
+      localStorage.setItem("farm_gas_sheets_list", JSON.stringify(state.gasSheetsList));
+      localStorage.setItem("farm_active_sheet_id", state.activeSheetId);
+    }
+
+    function populateHeaderSheetSelector() {
+      const select = document.getElementById("headerSheetSelector");
+      if (!select) return;
+
+      select.innerHTML = "";
+      state.gasSheetsList.forEach(s => {
+        const selected = s.id === state.activeSheetId ? "selected" : "";
+        select.innerHTML += `<option value="${s.id}" ${selected}>${s.name}</option>`;
+      });
+    }
+
+    function renderGasSheetsTable() {
+      const tbody = document.getElementById("gasSheetsTable");
+      if (!tbody) return;
+      tbody.innerHTML = "";
+
+      if (state.gasSheetsList.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-400">尚無設定任何 Google 試算表</td></tr>`;
+        return;
+      }
+
+      state.gasSheetsList.forEach(s => {
+        const isActive = s.id === state.activeSheetId;
+        const activeRadio = `<input type="radio" name="activeSheetGroup" onchange="switchActiveSheet('${s.id}')" ${isActive ? 'checked' : ''} class="w-4 h-4 text-emerald-600 focus:ring-emerald-500 cursor-pointer">`;
+        const activeBadge = isActive ? '<span class="ml-2 badge-green px-2 py-0.5 rounded text-xs font-bold">啟用中</span>' : '';
+
+        tbody.innerHTML += `
+          <tr class="${isActive ? 'bg-emerald-50/50' : 'hover:bg-slate-50'}">
+            <td class="p-3 text-center">${activeRadio}</td>
+            <td class="p-3 font-bold text-slate-800">${s.name} ${activeBadge}</td>
+            <td class="p-3 text-xs font-mono text-slate-500 max-w-xs truncate" title="${s.gasUrl}">${s.gasUrl}</td>
+            <td class="p-3 text-xs">
+              ${s.sheetUrl ? `<a href="${s.sheetUrl}" target="_blank" class="text-blue-600 hover:underline">開啟連結 🔗</a>` : '-'}
+            </td>
+            <td class="p-3 text-center space-x-1">
+              <button type="button" onclick="editGasSheet('${s.id}')" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded font-medium transition">編輯</button>
+              <button type="button" onclick="deleteGasSheet('${s.id}')" class="text-xs bg-rose-100 hover:bg-rose-200 text-rose-800 px-2.5 py-1 rounded font-medium transition">刪除</button>
+            </td>
+          </tr>
+        `;
+      });
     }
 
     function openGoogleSheet() {
       if (state.gasSheetUrl) {
         window.open(state.gasSheetUrl, "_blank");
       } else {
-        showToast("⚠️ 尚未設定 Google 試算表連結！", "warning");
+        showToast("⚠️ 當前啟用的試算表尚未設定網頁開啟連結！", "warning");
       }
     }
 
@@ -1242,6 +1455,8 @@
       renderShippingHistoryTable();
       renderChannelsTable();
       populateCustomerDropdown();
+      populateHeaderSheetSelector();
+      renderGasSheetsTable();
       generateNewRawLotNo();
       generateNewShipNo();
     }
