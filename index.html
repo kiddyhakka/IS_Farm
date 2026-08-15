@@ -1130,6 +1130,13 @@
       return null;
     }
 
+    // 取得種植日期格式化關鍵字 (YYYY/M/D) 以作為唯一批次標記
+    function getPlantDateKey(val) {
+      if (!val) return '';
+      const formatted = formatDateTime(val);
+      return formatted.split(' ')[0];
+    }
+
     // 判斷批號是否已超過冷藏預估期限
     function isRawExpired(r) {
       const expStr = getRawExpiryDate(r);
@@ -1205,12 +1212,15 @@
 
       switchTab("inbound");
 
-      // 將所屬蔬菜種類、採收日期、採收數量代入採收入庫頁面
+      // 取得種植日期關鍵字 (YYYY/M/D) 以區分不同種植批次
+      const plantKey = getPlantDateKey(field.plantDate);
+
+      // 將所屬蔬菜種類、採收日期、採收數量與標註種植日期的來源帶入採收入庫頁面
       const vegSelect = document.getElementById("rawVegType");
       if (vegSelect) vegSelect.value = field.vegType;
 
       const sourceInput = document.getElementById("rawSource");
-      if (sourceInput) sourceInput.value = `${field.id} (${field.vegType} 採${harvestIndex})`;
+      if (sourceInput) sourceInput.value = `${field.id} ${field.vegType} [種植:${plantKey}] (採${harvestIndex})`;
 
       const dateInput = document.getElementById("rawInDate");
       if (dateInput) dateInput.value = formattedDate;
@@ -1220,7 +1230,7 @@
 
       generateNewRawLotNo();
 
-      showToast(`已將 ${field.vegType} (${field.id} 採${harvestIndex}) 之採收日期與數量 (${harvestKg} kg) 代入至採收入庫表單`, "success");
+      showToast(`已將 ${field.vegType} (${field.id} 種植:${plantKey} 採${harvestIndex}) 之採收日期與數量 (${harvestKg} kg) 代入至採收入庫表單`, "success");
     }
 
     function saveRawInbound() {
@@ -1678,12 +1688,28 @@
       }
 
       state.fields.forEach((f, idx) => {
-        // 精確對照該筆紀錄該次採收是否已轉入冷藏
+        const plantKey = getPlantDateKey(f.plantDate);
+
+        // 精確對照：結合「田區」、「蔬菜種類」、「種植日期」與「採收次數」進行識別與轉入狀態判定
         const isTransferred1 = f.transferred1 === true || f.transferred1 === "已轉入" || f.transferred1 === "true" ||
-          state.rawInbound.some(r => r.source && r.source.includes(f.id) && r.vegType === f.vegType && (r.source.includes("採1") || r.source.includes("採收1")));
+          state.rawInbound.some(r => {
+            if (!r.source) return false;
+            const sameVeg = r.vegType === f.vegType;
+            const matchHarvest = r.source.includes("採1") || r.source.includes("採收1");
+            const matchField = f.id ? r.source.includes(f.id) : true;
+            const matchPlant = plantKey ? r.source.includes(plantKey) : true;
+            return sameVeg && matchHarvest && matchField && matchPlant;
+          });
 
         const isTransferred2 = f.transferred2 === true || f.transferred2 === "已轉入" || f.transferred2 === "true" ||
-          state.rawInbound.some(r => r.source && r.source.includes(f.id) && r.vegType === f.vegType && (r.source.includes("採2") || r.source.includes("採收2")));
+          state.rawInbound.some(r => {
+            if (!r.source) return false;
+            const sameVeg = r.vegType === f.vegType;
+            const matchHarvest = r.source.includes("採2") || r.source.includes("採收2");
+            const matchField = f.id ? r.source.includes(f.id) : true;
+            const matchPlant = plantKey ? r.source.includes(plantKey) : true;
+            return sameVeg && matchHarvest && matchField && matchPlant;
+          });
 
         const btn1 = isTransferred1 
           ? `<button type="button" onclick="transferHarvestToInbound(${idx}, 1)" class="text-xs badge-pink px-2.5 py-1 rounded-md font-bold transition shadow-sm w-full text-center" title="點擊可重新載入此資料至採收入庫">已轉入 (採1)</button>`
