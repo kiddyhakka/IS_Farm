@@ -164,6 +164,7 @@
                 <th class="p-3">總冷藏在庫</th>
                 <th class="p-3">逾期不可出貨量</th>
                 <th class="p-3">有效可出貨數量</th>
+                <th class="p-3">已出貨數量</th>
                 <th class="p-3">狀態標示</th>
               </tr>
             </thead>
@@ -233,7 +234,7 @@
                 <option value="青梗白菜">青梗白菜</option>
                 <option value="小芥菜">小芥菜</option>
                 <option value="蕹菜">蕹菜</option>
-                <option value="芥藍芽">芥藍芽</option>
+                <option value="芥籃芽">芥籃芽</option>
                 <option value="莧菜">莧菜</option>
                 <option value="葉萵苣">葉萵苣</option>
                 <option value="菠菜">菠菜</option>
@@ -349,7 +350,7 @@
                 <option value="青梗白菜">青梗白菜</option>
                 <option value="小芥菜">小芥菜</option>
                 <option value="蕹菜">蕹菜</option>
-                <option value="芥藍芽">芥藍芽</option>
+                <option value="芥籃芽">芥籃芽</option>
                 <option value="莧菜">莧菜</option>
                 <option value="葉萵苣">葉萵苣</option>
                 <option value="菠菜">菠菜</option>
@@ -782,7 +783,7 @@
       "小白菜": { fert: 5, pest1: 8, pest2: 15, h1: 25, h2: 32, expiry: 46 },
       "油菜":   { fert: 5, pest1: 8, pest2: 15, h1: 25, h2: 32, expiry: 57 },
       "青梗白菜":{ fert: 5, pest1: 8, pest2: 15, h1: 25, h2: 32, expiry: 57 },
-      "芥藍芽": { fert: 5, pest1: 7, pest2: null, h1: 17, h2: 24, expiry: 34 },
+      "芥籃芽": { fert: 5, pest1: 7, pest2: null, h1: 17, h2: 24, expiry: 34 },
       "菠菜":   { fert: 5, pest1: null, pest2: 19, h1: 38, h2: 45, expiry: 90 },
       "蕹菜":   { fert: 5, pest1: null, pest2: null, h1: 17, h2: 24, expiry: 31 },
       "葉萵苣": { fert: 5, pest1: 19, pest2: null, h1: 36, h2: 43, expiry: 73 },
@@ -1608,10 +1609,24 @@
           }
         });
 
-        if (totalInStock > 0) {
+        // 自動計算該蔬菜品項累計已出貨數量 (kg)
+        let shippedKg = 0;
+        state.shipping.forEach(ship => {
+          if (ship.items && Array.isArray(ship.items)) {
+            ship.items.forEach(item => {
+              if (item.vegType === veg) {
+                shippedKg += parseFloat(item.calculatedKg || 0);
+              }
+            });
+          }
+        });
+
+        if (totalInStock > 0 || shippedKg > 0) {
           hasData = true;
           let statusBadge = `<span class="badge-green px-2.5 py-1 rounded-full text-xs font-semibold">可正常出貨</span>`;
-          if (validKg === 0 && expiredKg > 0) {
+          if (totalInStock === 0 && shippedKg > 0) {
+            statusBadge = `<span class="bg-slate-200 text-slate-700 px-2.5 py-1 rounded-full text-xs font-semibold">已全數出貨</span>`;
+          } else if (validKg === 0 && expiredKg > 0) {
             statusBadge = `<span class="badge-red px-2.5 py-1 rounded-full text-xs font-semibold">全數逾期</span>`;
           } else if (expiredKg > 0) {
             statusBadge = `<span class="badge-yellow px-2.5 py-1 rounded-full text-xs font-semibold">部分逾期扣除</span>`;
@@ -1623,6 +1638,7 @@
               <td class="p-3 text-slate-600">${totalInStock.toFixed(1)} kg</td>
               <td class="p-3 text-rose-600 font-medium">${expiredKg > 0 ? '-' + expiredKg.toFixed(1) + ' kg' : '0 kg'}</td>
               <td class="p-3 font-extrabold text-emerald-600 text-base">${validKg.toFixed(1)} kg</td>
+              <td class="p-3 font-bold text-blue-600">${shippedKg.toFixed(1)} kg</td>
               <td class="p-3">${statusBadge}</td>
             </tr>
           `;
@@ -1630,7 +1646,7 @@
       });
 
       if (!hasData) {
-        tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-400">目前無冷藏在庫之蔬菜品項</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-400">目前無冷藏在庫或出貨紀錄之蔬菜品項</td></tr>`;
       }
     }
 
