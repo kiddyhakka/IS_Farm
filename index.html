@@ -148,11 +148,37 @@
         </div>
       </div>
 
+      <!-- Available Veg Inventory Summary Grid/Table -->
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="p-4 bg-emerald-50 border-b border-emerald-200 flex justify-between items-center">
+          <h3 class="font-bold text-emerald-900 flex items-center gap-2">
+            <span>🥬 目前各蔬菜可出貨數量統計</span>
+          </h3>
+          <span class="text-xs text-emerald-700 font-medium">（已自動扣除超過「冷藏預估期限」之逾期數量）</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm">
+            <thead class="bg-slate-100 text-slate-600 text-xs uppercase border-b border-slate-200">
+              <tr>
+                <th class="p-3">蔬菜品項</th>
+                <th class="p-3">總冷藏在庫</th>
+                <th class="p-3">逾期不可出貨量</th>
+                <th class="p-3">有效可出貨數量</th>
+                <th class="p-3">狀態標示</th>
+              </tr>
+            </thead>
+            <tbody id="dashboardVegSummaryTable" class="divide-y divide-slate-200">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <!-- Inventory Expiry Risk Table -->
       <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div class="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
           <h3 class="font-bold text-slate-800 flex items-center gap-2">
-            <span>🚨 冷藏在庫天數監控 (先進先出 FIFO 預警)</span>
+            <span>🚨 冷藏在庫天數監控 (僅顯示未逾期品項 / FIFO 預警)</span>
           </h3>
           <span class="text-xs text-slate-500">超過 7 天黃色警告 / 超過 14 天紅色告急</span>
         </div>
@@ -164,6 +190,7 @@
                 <th class="p-3">蔬菜品項</th>
                 <th class="p-3">田區來源</th>
                 <th class="p-3">入庫日期</th>
+                <th class="p-3">冷藏預估期限</th>
                 <th class="p-3">剩餘公斤數</th>
                 <th class="p-3">在庫天數</th>
                 <th class="p-3">狀態預警</th>
@@ -206,7 +233,7 @@
                 <option value="青梗白菜">青梗白菜</option>
                 <option value="小芥菜">小芥菜</option>
                 <option value="蕹菜">蕹菜</option>
-                <option value="芥藍芽">芥藍芽</option>
+                <option value="芥籃芽">芥籃芽</option>
                 <option value="莧菜">莧菜</option>
                 <option value="葉萵苣">葉萵苣</option>
                 <option value="菠菜">菠菜</option>
@@ -322,7 +349,7 @@
                 <option value="青梗白菜">青梗白菜</option>
                 <option value="小芥菜">小芥菜</option>
                 <option value="蕹菜">蕹菜</option>
-                <option value="芥藍芽">芥藍芽</option>
+                <option value="芥籃芽">芥籃芽</option>
                 <option value="莧菜">莧菜</option>
                 <option value="葉萵苣">葉萵苣</option>
                 <option value="菠菜">菠菜</option>
@@ -668,7 +695,7 @@
   <div id="adminModal" class="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 hidden p-4">
     <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 space-y-4">
       <h3 class="text-lg font-bold text-slate-800">🔑 管理者身分驗證</h3>
-      <p class="text-xs text-slate-500">此頁面為管理者權限，請輸入通行密碼</p>
+      <p class="text-xs text-slate-500">此頁面為管理者權限，請輸入通行密碼 (預設為 admin)</p>
       <input type="password" id="adminPasswordInput" placeholder="請輸入管理者密碼" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm outline-none">
       <div class="flex justify-end gap-2">
         <button type="button" onclick="closeAdminModal()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm font-semibold rounded-lg transition">取消</button>
@@ -755,7 +782,7 @@
       "小白菜": { fert: 5, pest1: 8, pest2: 15, h1: 25, h2: 32, expiry: 46 },
       "油菜":   { fert: 5, pest1: 8, pest2: 15, h1: 25, h2: 32, expiry: 57 },
       "青梗白菜":{ fert: 5, pest1: 8, pest2: 15, h1: 25, h2: 32, expiry: 57 },
-      "芥藍芽": { fert: 5, pest1: 7, pest2: null, h1: 17, h2: 24, expiry: 34 },
+      "芥籃芽": { fert: 5, pest1: 7, pest2: null, h1: 17, h2: 24, expiry: 34 },
       "菠菜":   { fert: 5, pest1: null, pest2: 19, h1: 38, h2: 45, expiry: 90 },
       "蕹菜":   { fert: 5, pest1: null, pest2: null, h1: 17, h2: 24, expiry: 31 },
       "葉萵苣": { fert: 5, pest1: 19, pest2: null, h1: 36, h2: 43, expiry: 73 },
@@ -1083,6 +1110,38 @@
       const today = new Date();
       const diffTime = Math.abs(today - inDate);
       return Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    }
+
+    // 取得批號的冷藏預估期限
+    function getRawExpiryDate(r) {
+      if (r.expiryDate) return r.expiryDate;
+      if (r.source) {
+        const matchedField = state.fields.find(f => r.source.includes(f.id));
+        if (matchedField && matchedField.expiryDate) {
+          return matchedField.expiryDate;
+        }
+      }
+      if (r.inDate && r.vegType && CROP_SCHEDULE_RULES[r.vegType]) {
+        const rule = CROP_SCHEDULE_RULES[r.vegType];
+        if (rule.expiry) {
+          return addDaysToDate(r.inDate, rule.expiry);
+        }
+      }
+      return null;
+    }
+
+    // 判斷批號是否已超過冷藏預估期限
+    function isRawExpired(r) {
+      const expStr = getRawExpiryDate(r);
+      if (!expStr) return false;
+      let expDate = new Date(expStr.replace(/-/g, '/'));
+      if (isNaN(expDate.getTime())) return false;
+      
+      // 若字串無時間或為 00:00，展延至當日最後一秒 (23:59:59)
+      if (!expStr.includes(':') || expStr.includes('00:00')) {
+        expDate.setHours(23, 59, 59, 999);
+      }
+      return new Date() > expDate;
     }
 
     function generateNewRawLotNo() {
@@ -1448,6 +1507,7 @@
 
     function renderAll() {
       renderStats();
+      renderVegSummaryTable();
       renderDashboardWarningTable();
       renderFieldRecordsTable();
       renderRawInboundTable();
@@ -1477,7 +1537,7 @@
 
       let warningCount = 0;
       state.rawInbound.forEach(r => {
-        if (getRawRemainingKg(r.rawLotNo) > 0 && getDaysInStorage(r.inDate) >= 7) {
+        if (getRawRemainingKg(r.rawLotNo) > 0 && getDaysInStorage(r.inDate) >= 7 && !isRawExpired(r)) {
           warningCount++;
         }
       });
@@ -1485,21 +1545,78 @@
       if (warningLotsEl) warningLotsEl.innerText = `${warningCount} 批`;
     }
 
+    function renderVegSummaryTable() {
+      const tbody = document.getElementById("dashboardVegSummaryTable");
+      if (!tbody) return;
+      tbody.innerHTML = "";
+
+      const vegTypes = Array.from(new Set([
+        ...Object.keys(CROP_SCHEDULE_RULES),
+        ...state.rawInbound.map(r => r.vegType).filter(Boolean)
+      ]));
+
+      let hasData = false;
+
+      vegTypes.forEach(veg => {
+        const rawLots = state.rawInbound.filter(r => r.vegType === veg);
+        let totalInStock = 0;
+        let expiredKg = 0;
+        let validKg = 0;
+
+        rawLots.forEach(r => {
+          const rem = getRawRemainingKg(r.rawLotNo);
+          if (rem > 0) {
+            totalInStock += rem;
+            if (isRawExpired(r)) {
+              expiredKg += rem;
+            } else {
+              validKg += rem;
+            }
+          }
+        });
+
+        if (totalInStock > 0) {
+          hasData = true;
+          let statusBadge = `<span class="badge-green px-2.5 py-1 rounded-full text-xs font-semibold">可正常出貨</span>`;
+          if (validKg === 0 && expiredKg > 0) {
+            statusBadge = `<span class="badge-red px-2.5 py-1 rounded-full text-xs font-semibold">全數逾期</span>`;
+          } else if (expiredKg > 0) {
+            statusBadge = `<span class="badge-yellow px-2.5 py-1 rounded-full text-xs font-semibold">部分逾期扣除</span>`;
+          }
+
+          tbody.innerHTML += `
+            <tr class="hover:bg-slate-50">
+              <td class="p-3 font-bold text-slate-800">${veg}</td>
+              <td class="p-3 text-slate-600">${totalInStock.toFixed(1)} kg</td>
+              <td class="p-3 text-rose-600 font-medium">${expiredKg > 0 ? '-' + expiredKg.toFixed(1) + ' kg' : '0 kg'}</td>
+              <td class="p-3 font-extrabold text-emerald-600 text-base">${validKg.toFixed(1)} kg</td>
+              <td class="p-3">${statusBadge}</td>
+            </tr>
+          `;
+        }
+      });
+
+      if (!hasData) {
+        tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-400">目前無冷藏在庫之蔬菜品項</td></tr>`;
+      }
+    }
+
     function renderDashboardWarningTable() {
       const tbody = document.getElementById("dashboardWarningTable");
       if (!tbody) return;
       tbody.innerHTML = "";
 
-      const activeLots = state.rawInbound.filter(r => getRawRemainingKg(r.rawLotNo) > 0);
+      const validLots = state.rawInbound.filter(r => getRawRemainingKg(r.rawLotNo) > 0 && !isRawExpired(r));
 
-      if (activeLots.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" class="p-4 text-center text-slate-400">目前試算表無在庫庫存批次</td></tr>`;
+      if (validLots.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="9" class="p-4 text-center text-slate-400">目前無符合條件且未逾期之冷藏庫存批次</td></tr>`;
         return;
       }
 
-      activeLots.forEach(r => {
+      validLots.forEach(r => {
         const remKg = getRawRemainingKg(r.rawLotNo);
         const days = getDaysInStorage(r.inDate);
+        const expiryStr = getRawExpiryDate(r);
 
         let badgeClass = "badge-green";
         let statusText = "安全 (FIFO 良好)";
@@ -1517,6 +1634,7 @@
             <td class="p-3 font-medium">${r.vegType || ''}</td>
             <td class="p-3 text-slate-500">${r.source || ''}</td>
             <td class="p-3 text-slate-500">${formatDateTime(r.inDate)}</td>
+            <td class="p-3 text-slate-500">${expiryStr ? formatDateTime(expiryStr) : '-'}</td>
             <td class="p-3 font-bold text-emerald-600">${remKg.toFixed(1)} kg</td>
             <td class="p-3 font-bold">${days} 天</td>
             <td class="p-3"><span class="px-2.5 py-1 rounded-full text-xs font-semibold ${badgeClass}">${statusText}</span></td>
