@@ -313,8 +313,8 @@
                 <th class="p-3">田區</th>
                 <th class="p-3">蔬菜種類</th>
                 <th class="p-3">種植日期</th>
-                <th class="p-3">採收1 (kg / 日期)</th>
-                <th class="p-3">採收2 (kg / 日期)</th>
+                <th class="p-3">用藥紀錄 (用藥1 / 用藥2)</th>
+                <th class="p-3">採收紀錄 (採收1 / 採收2)</th>
                 <th class="p-3">冷藏期限</th>
                 <th class="p-3">轉入冷藏作業</th>
               </tr>
@@ -1178,26 +1178,49 @@
       showToast("✅ 已送出田間紀錄至 Google 試算表！", "success");
     }
 
-    function transferHarvestToInbound(fieldId, harvestIndex) {
-      const field = state.fields.find(f => f.id === fieldId);
+    function transferHarvestToInbound(fieldIndex, harvestIndex) {
+      const field = state.fields[fieldIndex];
       if (!field) return;
 
       const harvestKg = harvestIndex === 1 ? field.harvest1Kg : field.harvest2Kg;
-      const harvestDate = harvestIndex === 1 ? field.harvest1Date : field.harvest2Date;
+      const harvestDateRaw = harvestIndex === 1 ? field.harvest1Date : field.harvest2Date;
 
       if (!harvestKg || harvestKg <= 0) {
         showToast("⚠️ 該次採收數量為 0 或尚未填寫！", "warning");
         return;
       }
 
+      // 拆解出 YYYY-MM-DD 格式以正確設定 date input
+      let formattedDate = new Date().toISOString().split('T')[0];
+      if (harvestDateRaw) {
+        const dStr = String(harvestDateRaw).trim();
+        const match = dStr.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+        if (match) {
+          const yyyy = match[1];
+          const mm = String(match[2]).padStart(2, '0');
+          const dd = String(match[3]).padStart(2, '0');
+          formattedDate = `${yyyy}-${mm}-${dd}`;
+        }
+      }
+
       switchTab("inbound");
-      document.getElementById("rawVegType").value = field.vegType;
-      document.getElementById("rawSource").value = `${field.id} (採${harvestIndex})`;
-      document.getElementById("rawInDate").value = harvestDate || new Date().toISOString().split('T')[0];
-      document.getElementById("rawWeightKg").value = harvestKg;
+
+      // 將所屬蔬菜種類、採收日期、採收數量代入採收入庫頁面
+      const vegSelect = document.getElementById("rawVegType");
+      if (vegSelect) vegSelect.value = field.vegType;
+
+      const sourceInput = document.getElementById("rawSource");
+      if (sourceInput) sourceInput.value = `${field.id} (${field.vegType} 採${harvestIndex})`;
+
+      const dateInput = document.getElementById("rawInDate");
+      if (dateInput) dateInput.value = formattedDate;
+
+      const weightInput = document.getElementById("rawWeightKg");
+      if (weightInput) weightInput.value = harvestKg;
+
       generateNewRawLotNo();
 
-      showToast(`已載入 ${field.id} (採${harvestIndex}) 資料至採收入庫表單`, "info");
+      showToast(`已將 ${field.vegType} (${field.id} 採${harvestIndex}) 之採收日期與數量 (${harvestKg} kg) 代入至採收入庫表單`, "success");
     }
 
     function saveRawInbound() {
@@ -1654,30 +1677,43 @@
         return;
       }
 
-      state.fields.forEach(f => {
+      state.fields.forEach((f, idx) => {
+        // 精確對照該筆紀錄該次採收是否已轉入冷藏
         const isTransferred1 = f.transferred1 === true || f.transferred1 === "已轉入" || f.transferred1 === "true" ||
-          state.rawInbound.some(r => r.source && r.source.includes(f.id) && (r.source.includes("採1") || r.source.includes("採收1")));
+          state.rawInbound.some(r => r.source && r.source.includes(f.id) && r.vegType === f.vegType && (r.source.includes("採1") || r.source.includes("採收1")));
 
         const isTransferred2 = f.transferred2 === true || f.transferred2 === "已轉入" || f.transferred2 === "true" ||
-          state.rawInbound.some(r => r.source && r.source.includes(f.id) && (r.source.includes("採2") || r.source.includes("採收2")));
+          state.rawInbound.some(r => r.source && r.source.includes(f.id) && r.vegType === f.vegType && (r.source.includes("採2") || r.source.includes("採收2")));
 
         const btn1 = isTransferred1 
-          ? `<button type="button" onclick="transferHarvestToInbound('${f.id}', 1)" class="text-xs badge-pink px-2.5 py-1 rounded-md font-bold transition shadow-sm" title="點擊可重新於冷藏庫載入此批號">已轉入 (採1)</button>`
-          : `<button type="button" onclick="transferHarvestToInbound('${f.id}', 1)" class="text-xs bg-emerald-100 hover:bg-emerald-200 text-emerald-800 px-2.5 py-1 rounded-md font-medium transition">轉入 (採1)</button>`;
+          ? `<button type="button" onclick="transferHarvestToInbound(${idx}, 1)" class="text-xs badge-pink px-2.5 py-1 rounded-md font-bold transition shadow-sm w-full text-center" title="點擊可重新載入此資料至採收入庫">已轉入 (採1)</button>`
+          : `<button type="button" onclick="transferHarvestToInbound(${idx}, 1)" class="text-xs bg-emerald-100 hover:bg-emerald-200 text-emerald-800 px-2.5 py-1 rounded-md font-medium transition w-full text-center">轉入 (採1)</button>`;
 
         const btn2 = isTransferred2
-          ? `<button type="button" onclick="transferHarvestToInbound('${f.id}', 2)" class="text-xs badge-pink px-2.5 py-1 rounded-md font-bold transition shadow-sm" title="點擊可重新於冷藏庫載入此批號">已轉入 (採2)</button>`
-          : `<button type="button" onclick="transferHarvestToInbound('${f.id}', 2)" class="text-xs bg-blue-100 hover:bg-blue-200 text-blue-800 px-2.5 py-1 rounded-md font-medium transition">轉入 (採2)</button>`;
+          ? `<button type="button" onclick="transferHarvestToInbound(${idx}, 2)" class="text-xs badge-pink px-2.5 py-1 rounded-md font-bold transition shadow-sm w-full text-center" title="點擊可重新載入此資料至採收入庫">已轉入 (採2)</button>`
+          : `<button type="button" onclick="transferHarvestToInbound(${idx}, 2)" class="text-xs bg-blue-100 hover:bg-blue-200 text-blue-800 px-2.5 py-1 rounded-md font-medium transition w-full text-center">轉入 (採2)</button>`;
+
+        const pest1Text = f.pest1Date ? `用藥1: ${formatDateTime(f.pest1Date)}` : `用藥1: -`;
+        const pest2Text = f.pest2Date ? `用藥2: ${formatDateTime(f.pest2Date)}` : `用藥2: -`;
+
+        const harvest1Text = (f.harvest1Kg || f.harvest1Kg === 0) ? `採收1: <span class="font-bold text-slate-800">${f.harvest1Kg} kg</span> <span class="text-xs text-slate-400">(${formatDateTime(f.harvest1Date)})</span>` : `採收1: -`;
+        const harvest2Text = (f.harvest2Kg || f.harvest2Kg === 0) ? `採收2: <span class="font-bold text-slate-800">${f.harvest2Kg} kg</span> <span class="text-xs text-slate-400">(${formatDateTime(f.harvest2Date)})</span>` : `採收2: -`;
 
         tbody.innerHTML += `
           <tr class="hover:bg-slate-50">
             <td class="p-3 font-bold text-slate-700">${f.id || ''}</td>
             <td class="p-3 font-medium text-emerald-800">${f.vegType || ''}</td>
             <td class="p-3 text-slate-500">${formatDateTime(f.plantDate)}</td>
-            <td class="p-3">${f.harvest1Kg || 0} kg <span class="text-xs text-slate-400">(${formatDateTime(f.harvest1Date)})</span></td>
-            <td class="p-3">${f.harvest2Kg || 0} kg <span class="text-xs text-slate-400">(${formatDateTime(f.harvest2Date)})</span></td>
+            <td class="p-3 text-xs text-slate-600 whitespace-nowrap">
+              <div class="py-0.5">${pest1Text}</div>
+              <div class="py-0.5 border-t border-slate-100 text-slate-500">${pest2Text}</div>
+            </td>
+            <td class="p-3 text-xs text-slate-700 whitespace-nowrap">
+              <div class="py-0.5">${harvest1Text}</div>
+              <div class="py-0.5 border-t border-slate-100 text-slate-500">${harvest2Text}</div>
+            </td>
             <td class="p-3 text-slate-500">${formatDateTime(f.expiryDate)}</td>
-            <td class="p-3 space-x-1.5">
+            <td class="p-3 space-y-1 min-w-[110px]">
               ${btn1}
               ${btn2}
             </td>
