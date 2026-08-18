@@ -252,7 +252,7 @@
             <h4 class="text-xs font-bold text-emerald-900 uppercase tracking-wider mb-2">🗓️ 自動推理日程 (可手動修改)</h4>
             <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
               <div>
-                <label class="block text-xs text-slate-600">施肥日</label>
+                <label class="block text-xs text-slate-600">追肥日</label>
                 <input type="date" id="fieldFertDate" class="w-full border border-slate-300 rounded p-1.5 text-xs outline-none">
               </div>
               <div>
@@ -313,7 +313,7 @@
               <tr>
                 <th class="p-3">田區</th>
                 <th class="p-3">蔬菜種類</th>
-                <th class="p-3">種植日期</th>
+                <th class="p-3">種植日 / 追肥日</th>
                 <th class="p-3">用藥紀錄 (用藥1 / 用藥2)</th>
                 <th class="p-3">採收紀錄 (採收1 / 採收2)</th>
                 <th class="p-3">冷藏期限</th>
@@ -695,8 +695,8 @@
   <!-- Admin Login Modal -->
   <div id="adminModal" class="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 hidden p-4">
     <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 space-y-4">
-      <h3 class="text-lg font-bold text-slate-800">🔑 管理者身分驗證 </h3>
-      <p class="text-xs text-slate-500">此頁面為管理者權限，請輸入通行密碼</p>
+      <h3 class="text-lg font-bold text-slate-800">🔑 管理者身分驗證</h3>
+      <p class="text-xs text-slate-500">此頁面為管理者權限，請輸入通行密碼 (預設為 admin)</p>
       <input type="password" id="adminPasswordInput" placeholder="請輸入管理者密碼" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm outline-none">
       <div class="flex justify-end gap-2">
         <button type="button" onclick="closeAdminModal()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm font-semibold rounded-lg transition">取消</button>
@@ -787,19 +787,19 @@
 
     // 蔬菜田間作業推算規則表
     const CROP_SCHEDULE_RULES = {
-      "小白菜": { fert: 5, pest1: 8, pest2: 15, h1: 25, h2: 32, expiry: 46 },
-      "油菜":   { fert: 5, pest1: 8, pest2: 15, h1: 25, h2: 32, expiry: 57 },
-      "青梗白菜":{ fert: 5, pest1: 8, pest2: 15, h1: 25, h2: 32, expiry: 57 },
-      "芥藍芽": { fert: 5, pest1: 7, pest2: null, h1: 17, h2: 24, expiry: 34 },
-      "菠菜":   { fert: 5, pest1: null, pest2: 19, h1: 38, h2: 45, expiry: 90 },
-      "蕹菜":   { fert: 5, pest1: null, pest2: null, h1: 17, h2: 24, expiry: 31 },
-      "葉萵苣": { fert: 5, pest1: 19, pest2: null, h1: 36, h2: 43, expiry: 73 },
-      "小芥菜": { fert: 5, pest1: 8, pest2: null, h1: 29, h2: 36, expiry: 54 },
+      "小白菜": { fert: 13, pest1: 8, pest2: 15, h1: 25, h2: 32, expiry: 46 },
+      "油菜":   { fert: 14, pest1: 8, pest2: 15, h1: 25, h2: 32, expiry: 57 },
+      "青梗白菜":{ fert: 14, pest1: 8, pest2: 15, h1: 25, h2: 32, expiry: 57 },
+      "芥藍芽": { fert: 9, pest1: 7, pest2: null, h1: 17, h2: 24, expiry: 34 },
+      "菠菜":   { fert: 22, pest1: 19, pest2: null, h1: 38, h2: 45, expiry: 90 },
+      "蕹菜":   { fert: 11, pest1: null, pest2: null, h1: 17, h2: 24, expiry: 31 },
+      "葉萵苣": { fert: 22, pest1: 19, pest2: null, h1: 36, h2: 43, expiry: 73 },
+      "小芥菜": { fert: 14, pest1: 8, pest2: null, h1: 29, h2: 36, expiry: 54 },
       "莧菜":   { fert: 5, pest1: 8, pest2: 15, h1: 25, h2: 32, expiry: 45 }
     };
 
-    // 預設固定單位順序：1kg、1斤、1籃、1袋、1包、1把
-    const FIXED_UNIT_ORDER = ["kg", "斤", "籃", "袋", "包", "把"];
+    // 預設固定單位順序：1. 把、2. 斤、3. kg、4. 包、5. 袋、6. 籃
+    const FIXED_UNIT_ORDER = ["把", "斤", "kg", "包", "袋", "籃"];
 
     // 多試算表預設與初始化
     const DEFAULT_GAS_SHEETS = [
@@ -828,10 +828,18 @@
       activeSheetId: activeSheetObj.id,
       gasUrl: activeSheetObj.gasUrl,
       gasSheetUrl: activeSheetObj.sheetUrl,
-      // 依序為 1kg, 1斤, 1籃, 1袋, 1包, 1把
-      units: JSON.parse(localStorage.getItem("farm_units") || JSON.stringify({
-        "kg": 1.0, "斤": 0.6, "籃": 12.0, "袋": 5.0, "包": 0.3, "把": 0.25
-      })),
+      // 依序為 把, 斤, kg, 包, 袋, 籃
+      units: (function() {
+        let u = JSON.parse(localStorage.getItem("farm_units") || JSON.stringify({
+          "把": 3.0, "斤": 0.6, "kg": 1.0, "包": 0.3, "袋": 5.0, "籃": 12.0
+        }));
+        // 若瀏覽器紀錄中仍為舊預設值 0.25，自動更新為 3.0
+        if (u && u["把"] === 0.25) { 
+          u["把"] = 3.0; 
+          localStorage.setItem("farm_units", JSON.stringify(u)); 
+        }
+        return u;
+      })(),
       channels: localStorage.getItem("farm_channels") ? JSON.parse(localStorage.getItem("farm_channels")) : [
         { id: 101, name: "全聯-高雄總倉", type: "連鎖超市", contact: "王經理", phone: "0912-345678", temp: "冷藏 (2℃~7℃)", address: "高雄市仁武區成功路1號" },
         { id: 102, name: "主婦聯盟有機店", type: "有機/合作社", contact: "李小姐", phone: "0922-888999", temp: "冷藏 (2℃~7℃)", address: "屏東市自由路100號" }
@@ -1277,9 +1285,9 @@
       shippingItemsState.push({
         rawLotNo: firstRaw ? firstRaw.rawLotNo : "",
         vegType: firstRaw ? firstRaw.vegType : "小白菜",
-        unit: "kg",
+        unit: "把",
         count: 0,
-        unitKg: state.units["kg"] || 1.0,
+        unitKg: state.units["把"] || 3.0,
         calculatedKg: 0
       });
       renderShippingItemsTable();
@@ -1307,7 +1315,7 @@
 
       if (unitSelect) {
         item.unit = unitSelect.value;
-        item.unitKg = state.units[item.unit] !== undefined ? state.units[item.unit] : 1.0;
+        item.unitKg = state.units[item.unit] !== undefined ? state.units[item.unit] : 3.0;
         if (unitKgInput) unitKgInput.value = item.unitKg;
       }
 
@@ -1724,6 +1732,9 @@
           ? `<button type="button" onclick="transferHarvestToInbound(${idx}, 2)" class="text-xs badge-pink px-2.5 py-1 rounded-md font-bold transition shadow-sm w-full text-center" title="點擊可重新載入此資料至採收入庫">已轉入 (採2)</button>`
           : `<button type="button" onclick="transferHarvestToInbound(${idx}, 2)" class="text-xs bg-blue-100 hover:bg-blue-200 text-blue-800 px-2.5 py-1 rounded-md font-medium transition w-full text-center">轉入 (採2)</button>`;
 
+        const plantText = f.plantDate ? `種植: ${formatDateTime(f.plantDate)}` : `種植: -`;
+        const fertText = f.fertDate ? `追肥: ${formatDateTime(f.fertDate)}` : `追肥: -`;
+
         const pest1Text = f.pest1Date ? `用藥1: ${formatDateTime(f.pest1Date)}` : `用藥1: -`;
         const pest2Text = f.pest2Date ? `用藥2: ${formatDateTime(f.pest2Date)}` : `用藥2: -`;
 
@@ -1734,7 +1745,10 @@
           <tr class="hover:bg-slate-50">
             <td class="p-3 font-bold text-slate-700">${f.id || ''}</td>
             <td class="p-3 font-medium text-emerald-800">${f.vegType || ''}</td>
-            <td class="p-3 text-slate-500">${formatDateTime(f.plantDate)}</td>
+            <td class="p-3 text-xs text-slate-600 whitespace-nowrap">
+              <div class="py-0.5">${plantText}</div>
+              <div class="py-0.5 border-t border-slate-100 text-slate-500">${fertText}</div>
+            </td>
             <td class="p-3 text-xs text-slate-600 whitespace-nowrap">
               <div class="py-0.5">${pest1Text}</div>
               <div class="py-0.5 border-t border-slate-100 text-slate-500">${pest2Text}</div>
@@ -1810,7 +1824,7 @@
           rawOptions = `<option value="">(試算表中無在庫原料，請先建立採收入庫)</option>`;
         }
 
-        // 嚴格依據 1kg、1斤、1籃、1袋、1包、1把 順序產生選單選項
+        // 嚴格依據 1.把、2.斤、3.kg、4.包、5.袋、6.籃 順序產生選單選項
         const availableUnits = Object.keys(state.units);
         const sortedUnits = [
           ...FIXED_UNIT_ORDER.filter(u => availableUnits.includes(u)),
@@ -1901,8 +1915,8 @@
             <td class="p-3 text-xs text-slate-500">${c.temp}</td>
             <td class="p-3 text-xs text-slate-500">${c.address || '-'}</td>
             <td class="p-3 text-center space-x-1">
-              <button type="button" onclick="quickShipToChannel('${c.name}')" class="text-xs bg-purple-100 hover:bg-purple-200 text-purple-800 px-2 py-1 rounded font-medium transition">快速出貨</button>
-              <button type="button" onclick="deleteChannel(${c.id})" class="text-xs bg-rose-100 hover:bg-rose-200 text-rose-800 px-2 py-1 rounded font-medium transition">刪除</button>
+              <button type="button" onclick="quickShipToChannel('${c.name}')" class="text-xs bg-purple-100 hover:bg-purple-200 text-purple-800 px-2.5 py-1 rounded font-medium transition">快速出貨</button>
+              <button type="button" onclick="deleteChannel(${c.id})" class="text-xs bg-rose-100 hover:bg-rose-200 text-rose-800 px-2.5 py-1 rounded font-medium transition">刪除</button>
             </td>
           </tr>
         `;
